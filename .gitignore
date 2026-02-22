@@ -1,0 +1,15 @@
+# --- Go ---
+bin/
+src/main
+src/producer
+src/consumer
+src/vendor/
+src/*.exe
+src/*.dll
+src/*.so
+src/*.dylib
+
+# --- Docker & DB ---
+src/pg_data/
+src/kafka_data/
+src/configs/local.env
