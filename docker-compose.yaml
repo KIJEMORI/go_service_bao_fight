@@ -50,6 +50,7 @@ services:
         condition: service_healthy
     environment:
       - KAFKA_BROKER=kafka:9092
+      - DB_CONFIG_HOST=postgres
 
   consumer-worker:
     build: .

@@ -1,5 +1,13 @@
 package rest
 
+import (
+	"net/http"
+	"project/internal/models"
+
+	"github.com/labstack/echo/v4"
+	"github.com/segmentio/kafka-go"
+)
+
 type MessageHandler interface {
 	Process(messages []models.Message) error
 }

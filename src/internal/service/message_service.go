@@ -1,36 +1,24 @@
 package service
 
-import (
-	"project/internal/models"
+// func (h *SaveDBHandler) ProcessMessages(messages []models.Message) error {
+// 	if len(messages) == 0 {
+// 		return nil
+// 	}
 
-	"go.uber.org/zap"
-	"gorm.io/gorm"
-)
+// 	// Выполняем массовую вставку в БД
+// 	err := h.db.CreateInBatches(messages, len(messages)).Error
+// 	if err != nil {
+// 		h.logger.Error("Failed to save batch to DB", zap.Error(err))
+// 		return err
+// 	}
 
-type SaveDBHandler struct {
-	db     *gorm.DB
-	logger *zap.Logger
-}
+// 	h.logger.Info("Successfully saved messages to DB", zap.Int("count", len(messages)))
+// 	return nil
+// }
 
-func (h *SaveDBHandler) ProcessMessages(messages []models.Message) error {
-	if len(messages) == 0 {
-		return nil
-	}
-
-	// Выполняем массовую вставку в БД
-	err := h.db.CreateInBatches(messages, len(messages)).Error
-	if err != nil {
-		h.logger.Error("Failed to save batch to DB", zap.Error(err))
-		return err
-	}
-
-	h.logger.Info("Successfully saved messages to DB", zap.Int("count", len(messages)))
-	return nil
-}
-
-func NewSaveDBHandler(db *gorm.DB, logger *zap.Logger) *SaveDBHandler {
-	return &SaveDBHandler{
-		db:     db,
-		logger: logger,
-	}
-}
+// func NewSaveDBHandler(db *gorm.DB, logger *zap.Logger) *SaveDBHandler {
+// 	return &SaveDBHandler{
+// 		db:     db,
+// 		logger: logger,
+// 	}
+// }

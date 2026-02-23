@@ -11,9 +11,11 @@ import (
 
 	"project/internal/config"
 	"project/internal/database"
+	"project/internal/infrastructure/kafka_topics"
 	"project/internal/service"
 	"project/internal/worker"
 
+	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
@@ -71,8 +73,8 @@ func main() {
 	}
 
 	if *mode == "users" || *mode == "all" {
-		userHandler := service.NewSaveDBHandler(db, logger)
-		start("user-saver", "registers-topic", userHandler, 2) // 2 горутины
+		userHandler := service.NewUserRegisterHandler(db, logger, &kafka.Writer{Addr: kafka.TCP(broker)})
+		start("user-saver", string(kafka_topics.UserRegisterTopic), userHandler, 2) // 2 горутины
 	}
 	if *mode == "logs" || *mode == "all" {
 		// logHandler := service.NewLogHandler(db, logger)

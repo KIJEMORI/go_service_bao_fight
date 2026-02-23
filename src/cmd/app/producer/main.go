@@ -12,6 +12,7 @@ import (
 
 	"project/api/router"
 	"project/internal/config"
+	"project/internal/database"
 	"project/internal/transport/rest"
 
 	"github.com/segmentio/kafka-go"
@@ -27,6 +28,16 @@ func main() {
 	defer logger.Sync()
 	config.LoadEnvironment()
 
+	if err := database.RunMigrations(database.GetMigrationDSN()); err != nil {
+		logger.Fatal("Failed to run migrations", zap.Error(err))
+	}
+
+	// Подключение к БД
+	db, err := database.NewConnection(database.GetDSN())
+	if err != nil {
+		logger.Fatal("Database connection failed", zap.Error(err))
+	}
+
 	// Настройка Kafka Writer
 	writer := &kafka.Writer{
 		Addr:     kafka.TCP(os.Getenv("KAFKA_BROKER")),
@@ -39,7 +50,7 @@ func main() {
 	defer stop()
 
 	// Инициализация сервера
-	handler := &rest.Handler{KafkaWriter: writer}
+	handler := rest.NewHandler(db, writer)
 	e := router.NewRouter(handler, *mode)
 
 	var wg sync.WaitGroup

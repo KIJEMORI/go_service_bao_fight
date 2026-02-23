@@ -3,17 +3,14 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"project/internal/infrastructure/kafka"
+	"project/internal/infrastructure/kafka_topics"
 	"project/internal/models"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/segmentio/kafka-go"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type RegisterUserHandler interface {
-	Process(users []models.User) error
-}
 
 func (h *Handler) RegisterUser(c echo.Context) error {
 
@@ -36,16 +33,26 @@ func (h *Handler) RegisterUser(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to secure password"})
 	}
-	input.Password = string(hashedPassword)
+	user := models.User{
+		Email:        input.Email,
+		PasswordHash: string(hashedPassword),
+	}
+	if err := h.db.WithContext(ctx).Create(&user).Error; err != nil {
+		// Проверяем на дубликат (Postgres SQLState 23505)
+		if strings.Contains(err.Error(), "duplicate key") {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "email already taken"})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "database error"})
+	}
 
-	payload, err := json.Marshal(input)
+	payload, err := json.Marshal(user)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to encode message"})
 	}
 
 	err = h.KafkaWriter.WriteMessages(ctx,
 		kafka.Message{
-			Topic: kafka.UserRegisterTopic.String(),
+			Topic: kafka_topics.UserRegisterTopic.String(),
 			Key:   []byte(input.Email), // Хорошая практика: использовать email как ключ для партиционирования
 			Value: payload,
 		},
@@ -55,8 +62,9 @@ func (h *Handler) RegisterUser(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, map[string]string{
-		"status": "sent",
+	return c.JSON(http.StatusCreated, map[string]string{
+		"status": "success",
+		"id":     user.ID.String(),
 		"email":  input.Email,
 	})
 
