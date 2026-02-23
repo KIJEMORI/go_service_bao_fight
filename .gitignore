@@ -1,8 +1,7 @@
 # --- Go ---
-bin/
 src/main
-src/producer
-src/consumer
+src/producer/
+src/consumer/
 src/vendor/
 src/*.exe
 src/*.dll
