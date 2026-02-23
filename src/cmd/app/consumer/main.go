@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -16,13 +18,25 @@ import (
 )
 
 func main() {
+	mode := flag.String("mode", "all", "Which workers to run: 'users', 'logs' or 'all'")
+	flag.Parse()
+
 	// Инициализация логгера и конфигов
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 	config.LoadEnvironment()
 
+	broker := os.Getenv("KAFKA_BROKER")
+	if broker == "" {
+		broker = "localhost:9092"
+	}
+
+	if err := database.RunMigrations(database.GetMigrationDSN()); err != nil {
+		logger.Fatal("Failed to run migrations", zap.Error(err))
+	}
+
 	// Подключение к БД
-	db, err := database.NewConnection()
+	db, err := database.NewConnection(database.GetDSN())
 	if err != nil {
 		logger.Fatal("Database connection failed", zap.Error(err))
 	}
@@ -33,30 +47,39 @@ func main() {
 	defer stop()
 
 	//  Инициализация хендлера (бизнес-логика)
-	dbHandler := service.NewSaveDBHandler(db, logger)
-
-	// Создание воркера
-	w := worker.NewKafkaWorker(worker.Config{
-		Name:      "DB-Saver",
-		Topic:     "messages-topic",
-		BatchSize: 100,             // Сброс при накоплении 100 сообщений
-		Interval:  1 * time.Second, // Или каждые 1с, если батч не полон
-		Handler:   dbHandler,
-		Logger:    logger,
-	})
+	//dbHandler := service.NewSaveDBHandler(db, logger)
 
 	var wg sync.WaitGroup
 
-	// Запуск воркера в горутине
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		logger.Info("Consumer worker started")
-		if err := w.Run(ctx); err != nil {
-			logger.Error("Worker error", zap.Error(err))
+	start := func(name, topic string, h worker.Handler, routines int) {
+		for i := 0; i < routines; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				w := worker.NewKafkaWorker(worker.Config{
+					Name:      name,
+					Topic:     topic,
+					Brokers:   []string{broker},
+					BatchSize: 50,
+					Interval:  2 * time.Second,
+					Handler:   h,
+					Logger:    logger.With(zap.String("worker", name), zap.Int("id", id)),
+				})
+				w.Run(ctx)
+			}(i)
 		}
-	}()
+	}
 
+	if *mode == "users" || *mode == "all" {
+		userHandler := service.NewSaveDBHandler(db, logger)
+		start("user-saver", "registers-topic", userHandler, 2) // 2 горутины
+	}
+	if *mode == "logs" || *mode == "all" {
+		// logHandler := service.NewLogHandler(db, logger)
+		// start("log-processor", "system-logs", logHandler, 1)
+	}
+
+	logger.Info("All consumers are running...")
 	// Ожидание завершения
 	<-ctx.Done() // Блокируемся, пока не придет сигнал
 	logger.Info("Shutting down consumer...")

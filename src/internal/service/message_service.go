@@ -7,12 +7,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type saveDBHandler struct {
+type SaveDBHandler struct {
 	db     *gorm.DB
 	logger *zap.Logger
 }
 
-func (h *saveDBHandler) Process(messages []models.Message) error {
+func (h *SaveDBHandler) ProcessMessages(messages []models.Message) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -28,8 +28,8 @@ func (h *saveDBHandler) Process(messages []models.Message) error {
 	return nil
 }
 
-func NewSaveDBHandler(db *gorm.DB, logger *zap.Logger) *saveDBHandler {
-	return &saveDBHandler{
+func NewSaveDBHandler(db *gorm.DB, logger *zap.Logger) *SaveDBHandler {
+	return &SaveDBHandler{
 		db:     db,
 		logger: logger,
 	}

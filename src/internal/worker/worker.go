@@ -8,6 +8,10 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+type Handler interface {
+	Process(ctx context.Context, batch [][]byte) error
+}
+
 type Worker struct {
 	reader    *kafka.Reader
 	handler   MessageHandler

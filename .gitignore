@@ -10,6 +10,6 @@ src/*.so
 src/*.dylib
 
 # --- Docker & DB ---
-src/pg_data/
-src/kafka_data/
-src/configs/local.env
+pg_data/
+kafka_data/
+configs/local.env

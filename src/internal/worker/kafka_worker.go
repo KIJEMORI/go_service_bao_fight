@@ -2,10 +2,7 @@ package worker
 
 import (
 	"context"
-	"os"
 	"time"
-
-	"project/internal/models"
 
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
@@ -13,10 +10,11 @@ import (
 
 type Config struct {
 	Name      string
+	Brokers   []string
 	Topic     string
 	BatchSize int
 	Interval  time.Duration
-	Handler   MessageHandler
+	Handler   Handler
 	Logger    *zap.Logger
 }
 
@@ -30,9 +28,9 @@ func NewKafkaWorker(cfg Config) BackgroundWorker {
 
 func (w *kafkaWorker) Run(ctx context.Context) error {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{os.Getenv("KAFKA_BROKER")},
+		Brokers: w.cfg.Brokers,
 		Topic:   w.cfg.Topic,
-		GroupID: "group-" + w.cfg.Name,
+		GroupID: w.cfg.Name,
 	})
 	defer reader.Close()
 
@@ -53,36 +51,33 @@ func (w *kafkaWorker) Run(ctx context.Context) error {
 		}
 	}()
 
-	buffer := make([]models.Message, 0, w.cfg.BatchSize)
+	batch := make([][]byte, 0, w.cfg.BatchSize)
 	ticker := time.NewTicker(w.cfg.Interval)
 	defer ticker.Stop()
 
-	w.cfg.Logger.Info("Worker started", zap.String("name", w.cfg.Name))
-
+	w.cfg.Logger.Info("Worker started",
+		zap.String("topic", w.cfg.Topic),
+		zap.String("group", w.cfg.Name),
+	)
 	for {
 		select {
 		case <-ctx.Done():
 			// При выключении сбрасываем остатки
-			return w.cfg.Handler.Process(buffer)
+			w.flush(context.Background(), &batch)
+			return nil
 
 		case m := <-msgChan:
 			// Сообщение пришло! Добавляем в буфер
-			buffer = append(buffer, models.Message{
-				Content:   string(m.Value),
-				CreatedAt: time.Now(),
-			})
-
-			if len(buffer) >= w.cfg.BatchSize {
-				w.cfg.Handler.Process(buffer)
-				buffer = buffer[:0]
-				ticker.Reset(w.cfg.Interval) // Сброс таймера, так как только что записали
+			batch = append(batch, m.Value)
+			if len(batch) >= w.cfg.BatchSize {
+				w.flush(ctx, &batch)
+				ticker.Reset(w.cfg.Interval)
 			}
 
 		case <-ticker.C:
 			// Таймер сработал (например, прошла 1 сек), сбрасываем всё что есть
-			if len(buffer) > 0 {
-				w.cfg.Handler.Process(buffer)
-				buffer = buffer[:0]
+			if len(batch) > 0 {
+				w.flush(ctx, &batch)
 			}
 
 		case err := <-errChan:
@@ -91,4 +86,20 @@ func (w *kafkaWorker) Run(ctx context.Context) error {
 			return err
 		}
 	}
+}
+
+func (w *kafkaWorker) flush(ctx context.Context, batch *[][]byte) {
+	if len(*batch) == 0 {
+		return
+	}
+
+	if err := w.cfg.Handler.Process(ctx, *batch); err != nil {
+		w.cfg.Logger.Error("Failed to process batch", zap.Error(err))
+		// Оффсеты в Kafka не закоммитятся автоматически, если ReadMessage не был завершен успешно,
+		// но при пакетной обработке стоит продумать стратегию ошибок (Dead Letter Queue).
+		return
+	}
+
+	// Очищаем слайс, сохраняя выделенную память
+	*batch = (*batch)[:0]
 }

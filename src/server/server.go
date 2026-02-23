@@ -18,7 +18,7 @@ func NewServer(h *rest.Handler) *Server {
 
 // Run запускает Echo сервер
 func (s *Server) Run() error {
-	// Вызываем функцию NewRouter (с маленькой буквы r в конце названия функции)
+	// Вызываем функцию NewRouter
 	e := router.NewRouter(s.handler)
 
 	port := os.Getenv("PORT")

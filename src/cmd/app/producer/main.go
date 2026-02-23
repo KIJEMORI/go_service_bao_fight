@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +19,9 @@ import (
 )
 
 func main() {
+	mode := flag.String("service", "all", "Which services to enable: 'users', 'billing' or 'all'")
+	flag.Parse()
+
 	// Инициализация инфраструктуры
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -26,7 +30,6 @@ func main() {
 	// Настройка Kafka Writer
 	writer := &kafka.Writer{
 		Addr:     kafka.TCP(os.Getenv("KAFKA_BROKER")),
-		Topic:    "messages-topic",
 		Balancer: &kafka.LeastBytes{},
 	}
 	defer writer.Close()
@@ -37,7 +40,7 @@ func main() {
 
 	// Инициализация сервера
 	handler := &rest.Handler{KafkaWriter: writer}
-	e := router.NewRouter(handler)
+	e := router.NewRouter(handler, *mode)
 
 	var wg sync.WaitGroup
 
