@@ -5,6 +5,8 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"project/internal/config"
 	"project/internal/database"
 	"project/internal/infrastructure/kafka_topics"
+	startflags "project/internal/infrastructure/start_flags"
 	"project/internal/service"
 	"project/internal/worker"
 
@@ -22,6 +25,8 @@ import (
 func main() {
 	mode := flag.String("mode", "all", "Which workers to run: 'users', 'logs' or 'all'")
 	flag.Parse()
+
+	services := strings.Split(*mode, ",")
 
 	// Инициализация логгера и конфигов
 	logger, _ := zap.NewProduction()
@@ -72,13 +77,22 @@ func main() {
 		}
 	}
 
-	if *mode == "users" || *mode == "all" {
+	enabled := func(name startflags.Flag) bool {
+		ret := slices.Contains(services, string(name)) || slices.Contains(services, "all")
+		return ret
+	}
+
+	if enabled(startflags.UserRegisterFlag) {
 		userHandler := service.NewUserRegisterHandler(db, logger, &kafka.Writer{Addr: kafka.TCP(broker)})
 		start("user-saver", string(kafka_topics.UserRegisterTopic), userHandler, 2) // 2 горутины
 	}
 	if *mode == "logs" || *mode == "all" {
 		// logHandler := service.NewLogHandler(db, logger)
 		// start("log-processor", "system-logs", logHandler, 1)
+	}
+	if enabled(startflags.SendMessage) {
+		msgHandler := service.NewMessageSaveHandler(db, logger)
+		start("message-saver-v2", string(kafka_topics.ChatMessagesTopic), msgHandler, 3)
 	}
 
 	logger.Info("All consumers are running...")

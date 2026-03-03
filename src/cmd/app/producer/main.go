@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -13,20 +17,26 @@ import (
 	"project/api/router"
 	"project/internal/config"
 	"project/internal/database"
+	"project/internal/infrastructure/kafka_topics"
+	startflags "project/internal/infrastructure/start_flags"
+	"project/internal/models"
 	"project/internal/transport/rest"
 
+	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
 func main() {
-	mode := flag.String("service", "all", "Which services to enable: 'users', 'billing' or 'all'")
+	mode := flag.String("service", "all", "Which services to enable: 'user_login','user_register','send_message','all'")
 	flag.Parse()
 
 	// Инициализация инфраструктуры
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 	config.LoadEnvironment()
+
+	services := strings.Split(*mode, ",")
 
 	if err := database.RunMigrations(database.GetMigrationDSN()); err != nil {
 		logger.Fatal("Failed to run migrations", zap.Error(err))
@@ -50,8 +60,19 @@ func main() {
 	defer stop()
 
 	// Инициализация сервера
-	handler := rest.NewHandler(db, writer)
-	e := router.NewRouter(handler, *mode)
+	handler := rest.NewHandler(db, writer, logger)
+
+	enabled := func(name startflags.Flag) bool {
+		ret := slices.Contains(services, string(name)) || slices.Contains(services, "all")
+		return ret
+	}
+
+	if enabled(startflags.SendMessage) {
+		go StartChatWatcher(ctx, handler, os.Getenv("KAFKA_BROKER"))
+	}
+
+	e := router.NewRouter(handler, services)
+	EnsureTopics(os.Getenv("KAFKA_BROKER"))
 
 	var wg sync.WaitGroup
 
@@ -81,4 +102,52 @@ func main() {
 
 	wg.Wait()
 	logger.Info("Producer API exited cleanly")
+}
+
+func StartChatWatcher(ctx context.Context, h *rest.Handler, broker string) {
+	reader := kafka.NewReader(kafka.ReaderConfig{
+		Brokers: []string{broker},
+		Topic:   kafka_topics.ChatMessagesTopic.String(),
+		GroupID: "ws-notifier-" + uuid.New().String(), // У каждого пода свой ID, чтобы все видели всё
+	})
+
+	for {
+		m, err := reader.ReadMessage(ctx)
+		if err != nil {
+			return
+		}
+
+		var msg models.Message
+		json.Unmarshal(m.Value, &msg)
+
+		// Ищем получателя в нашем хабе
+		h.Hub.Mu.RLock()
+		if conns, ok := h.Hub.Clients[msg.ReceiverID.String()]; ok {
+			for _, conn := range conns {
+				conn.WriteJSON(msg) // МГНОВЕННАЯ ДОСТАВКА!
+			}
+		}
+		h.Hub.Mu.RUnlock()
+	}
+}
+
+func EnsureTopics(broker string) {
+	conn, err := kafka.Dial("tcp", broker)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	topicConfigs := []kafka.TopicConfig{
+		{
+			Topic:             kafka_topics.ChatMessagesTopic.String(),
+			NumPartitions:     3,
+			ReplicationFactor: 1,
+		},
+	}
+
+	err = conn.CreateTopics(topicConfigs...)
+	if err != nil {
+		fmt.Printf("Note: Topics might already exist: %v\n", err)
+	}
 }

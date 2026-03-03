@@ -1,24 +1,39 @@
 package service
 
-// func (h *SaveDBHandler) ProcessMessages(messages []models.Message) error {
-// 	if len(messages) == 0 {
-// 		return nil
-// 	}
+import (
+	"context"
+	"encoding/json"
+	"project/internal/models"
 
-// 	// Выполняем массовую вставку в БД
-// 	err := h.db.CreateInBatches(messages, len(messages)).Error
-// 	if err != nil {
-// 		h.logger.Error("Failed to save batch to DB", zap.Error(err))
-// 		return err
-// 	}
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+)
 
-// 	h.logger.Info("Successfully saved messages to DB", zap.Int("count", len(messages)))
-// 	return nil
-// }
+type MessageSaveHandler struct {
+	db     *gorm.DB
+	logger *zap.Logger
+}
 
-// func NewSaveDBHandler(db *gorm.DB, logger *zap.Logger) *SaveDBHandler {
-// 	return &SaveDBHandler{
-// 		db:     db,
-// 		logger: logger,
-// 	}
-// }
+func NewMessageSaveHandler(db *gorm.DB, logger *zap.Logger) *MessageSaveHandler {
+	return &MessageSaveHandler{
+		db:     db,
+		logger: logger,
+	}
+}
+
+func (h *MessageSaveHandler) Process(ctx context.Context, batch [][]byte) error {
+	var msgs []models.Message
+	for _, data := range batch {
+		var m models.Message
+		if err := json.Unmarshal(data, &m); err != nil {
+			h.logger.Error("Unmarshal error", zap.Error(err), zap.String("raw", string(data)))
+			continue
+		}
+		msgs = append(msgs, m)
+	}
+
+	if len(msgs) > 0 {
+		return h.db.WithContext(ctx).CreateInBatches(msgs, 100).Error
+	}
+	return nil
+}

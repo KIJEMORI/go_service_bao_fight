@@ -43,7 +43,11 @@ services:
     build: .
     env_file:
       - ./configs/local.env
-    command: ./producer -service=users
+    command:
+      [
+        "./producer",
+        "-service=user_login,user_register,send_message,get_messages",
+      ]
     ports: ["8080:8080"]
     depends_on:
       kafka:
@@ -56,7 +60,7 @@ services:
     build: .
     env_file:
       - ./configs/local.env
-    command: ./consumer -mode=users
+    command: ["./consumer", "-mode=user_login,send_message"]
     depends_on:
       postgres:
         condition: service_healthy

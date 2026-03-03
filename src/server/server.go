@@ -17,7 +17,7 @@ func NewServer(h *rest.Handler) *Server {
 }
 
 // Run запускает Echo сервер
-func (s *Server) Run(mode string) error {
+func (s *Server) Run(mode []string) error {
 	// Вызываем функцию NewRouter
 	e := router.NewRouter(s.handler, mode)
 

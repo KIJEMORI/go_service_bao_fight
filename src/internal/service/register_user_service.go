@@ -29,16 +29,16 @@ import (
 //	}
 
 type UserRegisterHandler struct {
-	db             *gorm.DB
-	logger         *zap.Logger
-	notifierWriter *kafka.Writer // Писатель в топик ошибок
+	db     *gorm.DB
+	logger *zap.Logger
+	writer *kafka.Writer // Писатель в топик ошибок
 }
 
 func NewUserRegisterHandler(db *gorm.DB, logger *zap.Logger, writer *kafka.Writer) *UserRegisterHandler {
 	return &UserRegisterHandler{
-		db:             db,
-		logger:         logger,
-		notifierWriter: writer,
+		db:     db,
+		logger: logger,
+		writer: writer,
 	}
 }
 
@@ -109,7 +109,7 @@ func (h *UserRegisterHandler) handleDuplicates(ctx context.Context, original []m
 			}
 			payload, _ := json.Marshal(msg)
 
-			h.notifierWriter.WriteMessages(ctx, kafka.Message{
+			h.writer.WriteMessages(ctx, kafka.Message{
 				Topic: kafka_topics.UserRegisterErrorTopic.String(),
 				Key:   []byte(user.Email),
 				Value: payload,
