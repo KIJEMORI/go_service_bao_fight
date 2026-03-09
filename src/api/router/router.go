@@ -52,7 +52,7 @@ func NewRouter(h *rest.Handler, enabledServices []string) *echo.Echo {
 	protected.Use(echojwt.WithConfig(jwtConfig))
 
 	if enabled(startflags.SearchUserFlag) {
-		protected.GET("/search", h.SearchUser)
+		protected.GET("/search_user", h.SearchUser)
 	}
 	if enabled(startflags.SendMessage) {
 		protected.POST("/send_message", h.SendMessage)
@@ -68,7 +68,7 @@ func NewRouter(h *rest.Handler, enabledServices []string) *echo.Echo {
 		protected.POST("/change_profile", h.ChangeProfile)
 	}
 	if enabled(startflags.ChangeProfileAvatar) {
-		protected.GET("/change_profile_avatar", h.GetUploadURL)
+		protected.GET("/change_profile_avatar_url", h.GetUploadURL)
 		protected.POST("/confirm_change_profile_avatar", h.ConfirmUpload)
 	}
 
