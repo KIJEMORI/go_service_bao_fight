@@ -16,6 +16,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - app-network
 
   kafka:
     image: apache/kafka:3.7.0
@@ -30,7 +32,7 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     ports:
-      - "8090:8080" # Будет доступен по адресу http://localhost:8090
+      - "8090:8080"
     depends_on:
       kafka:
         condition: service_healthy
@@ -43,24 +45,33 @@ services:
     build: .
     env_file:
       - ./configs/local.env
-    command:
-      [
-        "./producer",
-        "-service=user_login,user_register,send_message,get_messages",
-      ]
-    ports: ["8080:8080"]
+      - ./configs/minio.env
+    command: ["./producer", "-service=all"]
+    # ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       kafka:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
+      - MINIO_ENDPOINT=minio:9000
       - KAFKA_BROKER=kafka:9092
       - DB_CONFIG_HOST=postgres
+      - REDIS_HOST=redis:6379
+    networks:
+      - app-network
 
   consumer-worker:
     build: .
     env_file:
       - ./configs/local.env
-    command: ["./consumer", "-mode=user_login,send_message"]
+    command: ["./consumer", "-mode=all"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,6 +80,69 @@ services:
     environment:
       - KAFKA_BROKER=kafka:9092
       - DB_CONFIG_HOST=postgres
+      - REDIS_HOST=redis:6379
+    networks:
+      - app-network
+
+  minio:
+    image: minio/minio
+    # ports:
+    #   - "9000:9000" # API
+    #   - "9001:9001" # Консоль управления
+    env_file:
+      - ./configs/minio.env
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    environment:
+      MINIO_BROWSER_REDIRECT_URL: "http://localhost/minio-admin/"
+
+  gateway:
+    image: openresty/openresty:alpine # nginx
+    ports:
+      - "80:80" # HTTP
+      - "8080:8080" # старый порт для API
+    volumes:
+      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - ./nginx/lua:/usr/local/openresty/nginx/conf/lua:ro
+      - ./nginx/cache:/var/cache/nginx/s3_cache # Папка для кэша картинок
+    depends_on:
+      minio:
+        condition: service_healthy
+      producer-api:
+        condition: service_healthy
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   pg_data:
+
+networks:
+  app-network:
+    driver: bridge

@@ -32,6 +32,10 @@ func (h *Handler) RegisterUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "email and password are required"})
 	}
 
+	if len(input.Password) < 8 {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "the password must not be shorter than 8 characters"})
+	}
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to secure password"})
@@ -73,10 +77,7 @@ func (h *Handler) RegisterUser(c echo.Context) error {
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"access_token":  at,
 		"refresh_token": rt,
-		"user": map[string]string{
-			"id":    user.ID.String(),
-			"email": user.Email,
-		},
+		"user_id":       user.ID.String(),
 	})
 
 }

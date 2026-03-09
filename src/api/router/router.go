@@ -15,6 +15,10 @@ import (
 func NewRouter(h *rest.Handler, enabledServices []string) *echo.Echo {
 	e := echo.New()
 
+	e.GET("/health", func(c echo.Context) error {
+		return c.NoContent(200)
+	})
+
 	// Полезные мидлвары: логирование запросов и восстановление после паники
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
@@ -47,13 +51,25 @@ func NewRouter(h *rest.Handler, enabledServices []string) *echo.Echo {
 	protected := v1.Group("/prot")
 	protected.Use(echojwt.WithConfig(jwtConfig))
 
+	if enabled(startflags.SearchUserFlag) {
+		protected.GET("/search", h.SearchUser)
+	}
 	if enabled(startflags.SendMessage) {
 		protected.POST("/send_message", h.SendMessage)
 	}
 	if enabled(startflags.GetMessages) {
 		// Внутри NewRouter, в группе protected
+		protected.POST("/join_chat", h.JoinChat)
 		protected.GET("/messages", h.GetChatHistory)
 		protected.GET("/ws_messages", h.HandleWS)
+	}
+	if enabled(startflags.ChangeProfile) {
+		protected.GET("/get_profile", h.GetProfile)
+		protected.POST("/change_profile", h.ChangeProfile)
+	}
+	if enabled(startflags.ChangeProfileAvatar) {
+		protected.GET("/change_profile_avatar", h.GetUploadURL)
+		protected.POST("/confirm_change_profile_avatar", h.ConfirmUpload)
 	}
 
 	return e

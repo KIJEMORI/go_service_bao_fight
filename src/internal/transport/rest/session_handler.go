@@ -18,6 +18,7 @@ func (h *Handler) createSession(c echo.Context, userID uuid.UUID) (string, strin
 	// Генерируем Access Token (короткий)
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID.String(),
+		"role":    "user",
 		"exp":     time.Now().Add(time.Minute * 15).Unix(), // 15 минут
 	})
 	at, _ := accessToken.SignedString([]byte(os.Getenv("JWT_SECRET")))

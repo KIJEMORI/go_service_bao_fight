@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"project/internal/infrastructure/kafka_topics"
 	"project/internal/models"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,16 +58,16 @@ func (h *Handler) SendMessage(c echo.Context) error {
 
 	// Добавляем receiver_id во входящую структуру
 	var input struct {
-		ReceiverID string `json:"receiver_id" validate:"required"`
-		Text       string `json:"text" validate:"required"`
+		ChatID string `json:"chat_id" validate:"required"`
+		Text   string `json:"text" validate:"required"`
 	}
 
 	if err := c.Bind(&input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
 	}
 
-	if input.ReceiverID == "" || input.Text == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "receiver_id and text are required"})
+	if input.ChatID == "" || input.Text == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "chat_id and text are required"})
 	}
 
 	// Парсим ID отправителя
@@ -79,18 +78,19 @@ func (h *Handler) SendMessage(c echo.Context) error {
 	}
 
 	// Парсим ID получателя
-	rID, err := uuid.Parse(input.ReceiverID)
+	cID, err := uuid.Parse(input.ChatID)
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid receiver id format"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid chat id format"})
 	}
 
 	// Формируем полную модель сообщения
+
 	msg := models.Message{
-		ID:         uuid.New(),
-		SenderID:   sID,
-		ReceiverID: rID,
-		Text:       input.Text,
-		CreatedAt:  time.Now(),
+		ID:        uuid.New(),
+		ChatID:    cID,
+		SenderID:  sID,
+		Text:      input.Text,
+		CreatedAt: time.Now(),
 	}
 
 	payload, _ := json.Marshal(msg)
@@ -99,7 +99,7 @@ func (h *Handler) SendMessage(c echo.Context) error {
 	err = h.KafkaWriter.WriteMessages(ctx,
 		kafka.Message{
 			Topic: kafka_topics.ChatMessagesTopic.String(), // Указываем топик чата
-			Key:   []byte(input.ReceiverID),                // Ключ по получателю для порядка сообщений
+			Key:   []byte(input.ChatID),                    // Ключ по получателю для порядка сообщений
 			Value: payload,
 		},
 	)
@@ -112,48 +112,6 @@ func (h *Handler) SendMessage(c echo.Context) error {
 		"status": "sent",
 		"id":     msg.ID,
 	})
-}
-
-func (h *Handler) GetChatHistory(c echo.Context) error {
-	ctx := c.Request().Context()
-
-	// Получаем ID текущего пользователя из JWT (который положила мидлвара)
-	userVal := c.Get("user")
-
-	currentUserID, err := getSenderID(c, h, userVal)
-	if err != nil {
-		return err
-	}
-
-	// Получаем ID собеседника из параметров запроса
-	otherUserID := c.QueryParam("with_user_id")
-	if otherUserID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "with_user_id is required"})
-	}
-
-	// Параметры пагинации
-	limit, _ := strconv.Atoi(c.QueryParam("limit"))
-	if limit == 0 {
-		limit = 50
-	} // По умолчанию 50 сообщений
-
-	var messages []models.Message
-
-	offset, _ := strconv.Atoi(c.QueryParam("offset"))
-
-	err = h.DB.WithContext(ctx).
-		Where("(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)",
-			currentUserID, otherUserID, otherUserID, currentUserID).
-		Order("created_at DESC").
-		Limit(limit).
-		Offset(offset). // Пропускаем уже загруженные сообщения
-		Find(&messages).Error
-
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "db error"})
-	}
-
-	return c.JSON(http.StatusOK, messages)
 }
 
 func (h *Handler) HandleWS(c echo.Context) error {

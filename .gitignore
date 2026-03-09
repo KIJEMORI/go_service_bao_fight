@@ -12,3 +12,4 @@ src/*.dylib
 pg_data/
 kafka_data/
 configs/local.env
+configs/minio.env

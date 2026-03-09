@@ -37,9 +37,6 @@ func (h *Handler) LoginUser(c echo.Context) error {
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"access_token":  at,
 		"refresh_token": rt,
-		"user": map[string]string{
-			"id":    user.ID.String(),
-			"email": user.Email,
-		},
+		"user_id":       user.ID.String(),
 	})
 }
