@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -19,10 +18,8 @@ import (
 	"project/internal/database"
 	"project/internal/infrastructure/kafka_topics"
 	startflags "project/internal/infrastructure/start_flags"
-	"project/internal/models"
 	"project/internal/transport/rest"
 
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/redis/go-redis/v9"
@@ -125,8 +122,8 @@ func main() {
 		return ret
 	}
 
-	if enabled(startflags.SendMessage) {
-		go StartChatWatcher(ctx, handler, os.Getenv("KAFKA_BROKER"))
+	if enabled(startflags.WebSocket) {
+		go handler.StartChatWatcher(ctx, os.Getenv("KAFKA_BROKER"))
 	}
 
 	e := router.NewRouter(handler, services)
@@ -160,36 +157,6 @@ func main() {
 
 	wg.Wait()
 	logger.Info("Producer API exited cleanly")
-}
-
-func StartChatWatcher(ctx context.Context, h *rest.Handler, broker string) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{broker},
-		Topic:   kafka_topics.ChatMessagesTopic.String(),
-		GroupID: "ws-notifier-" + uuid.New().String(), // У каждого пода свой ID, чтобы все видели всё
-	})
-
-	for {
-		m, err := reader.ReadMessage(ctx)
-		if err != nil {
-			return
-		}
-
-		var msg models.Message
-		json.Unmarshal(m.Value, &msg)
-
-		participants := h.GetChatParticipants(ctx, msg.ChatID)
-
-		// Ищем чат в нашем хабе
-		for _, userID := range participants {
-			if conns, ok := h.Hub.Clients[userID]; ok {
-				for _, conn := range conns {
-					conn.WriteJSON(msg)
-				}
-			}
-		}
-		h.Hub.Mu.RUnlock()
-	}
 }
 
 func EnsureTopics(broker string) {

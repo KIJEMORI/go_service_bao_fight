@@ -12,6 +12,11 @@ const (
 	ChangeProfile          Topic = "change-profile-v1"
 	ChangeProfileAvatar    Topic = "change-profile-avatar-v1"
 	SearchUser             Topic = "search-user-v1"
+	NewActionProfile       Topic = "new-action-profile-v1"
+	ActionLikeProfile      Topic = "action-like-profile-v1"
+	MatchFind              Topic = "match-find-v1"
+	MatchFindNotification  Topic = "match-notification-v1"
+	LikeNotification       Topic = "like-notification-v1"
 )
 
 // String преобразует тип Topic в строку для библиотек

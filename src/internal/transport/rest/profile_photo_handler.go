@@ -76,11 +76,11 @@ func (h *Handler) GetUploadURL(c echo.Context) error {
 
 	// Генерируем ссылку для PUT-запроса
 	expiry := time.Second * 60 * 15
-	presignedURL, err := h.S3Client.PresignedPutObject(c.Request().Context(),
+	presignedURL, err := h.s3Client.PresignedPutObject(c.Request().Context(),
 		"profiles", objectName, expiry)
 
 	if err != nil {
-		h.Logger.Error("S3 presign failed", zap.Error(err))
+		h.logger.Error("S3 presign failed", zap.Error(err))
 		return c.JSON(500, map[string]string{"error": "failed to gen url"})
 	}
 	externalURL := strings.Replace(presignedURL.String(), "http://minio:9000/profiles", "http://localhost/s3-upload", 1)
@@ -106,7 +106,7 @@ func (h *Handler) ConfirmUpload(c echo.Context) error {
 	photoURL := "/storage/" + input.ObjectKey
 	uID, _ := uuid.Parse(userID)
 
-	err = h.DB.Transaction(func(tx *gorm.DB) error {
+	err = h.db.Transaction(func(tx *gorm.DB) error {
 		// Снимаем статус "текущая" со всех старых аватарок юзера
 		tx.Model(&models.ProfileAvatar{}).Where("user_id = ?", uID).Update("is_current", false)
 

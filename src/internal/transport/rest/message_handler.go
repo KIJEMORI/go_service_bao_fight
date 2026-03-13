@@ -31,7 +31,7 @@ func getSenderID(c echo.Context, h *Handler, userVal any) (string, error) {
 	}
 
 	if err := json.Unmarshal(jsonBytes, &tokenData); err != nil {
-		h.Logger.Error("JSON conversion failed", zap.Error(err))
+		h.logger.Error("JSON conversion failed", zap.Error(err))
 		return "", c.JSON(http.StatusInternalServerError, map[string]string{"error": "internal token error"})
 	}
 
@@ -39,7 +39,7 @@ func getSenderID(c echo.Context, h *Handler, userVal any) (string, error) {
 	senderID, _ := tokenData.Claims["user_id"].(string)
 
 	if senderID == "" {
-		h.Logger.Error("CRITICAL: user_id NOT found after JSON sync", zap.String("raw", string(jsonBytes)))
+		h.logger.Error("CRITICAL: user_id NOT found after JSON sync", zap.String("raw", string(jsonBytes)))
 		return "", c.JSON(http.StatusUnauthorized, map[string]string{"error": "user_id missing"})
 	}
 
@@ -73,7 +73,7 @@ func (h *Handler) SendMessage(c echo.Context) error {
 	// Парсим ID отправителя
 	sID, err := uuid.Parse(senderID)
 	if err != nil {
-		h.Logger.Error("Invalid sender UUID", zap.String("id", senderID))
+		h.logger.Error("Invalid sender UUID", zap.String("id", senderID))
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid sender id"})
 	}
 
@@ -81,6 +81,12 @@ func (h *Handler) SendMessage(c echo.Context) error {
 	cID, err := uuid.Parse(input.ChatID)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid chat id format"})
+	}
+
+	var count int64
+	h.db.Model(&models.ChatMember{}).Where("chat_id = ? AND user_id = ?", cID, sID).Count(&count)
+	if count == 0 {
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "you are not a member of this chat"})
 	}
 
 	// Формируем полную модель сообщения
@@ -93,10 +99,15 @@ func (h *Handler) SendMessage(c echo.Context) error {
 		CreatedAt: time.Now(),
 	}
 
+	if err := h.db.WithContext(ctx).Create(&msg).Error; err != nil {
+		h.logger.Error("DB error saving message", zap.Error(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to save message"})
+	}
+
 	payload, _ := json.Marshal(msg)
 
 	// Отправляем в Kafka
-	err = h.KafkaWriter.WriteMessages(ctx,
+	err = h.kafkaWriter.WriteMessages(ctx,
 		kafka.Message{
 			Topic: kafka_topics.ChatMessagesTopic.String(), // Указываем топик чата
 			Key:   []byte(input.ChatID),                    // Ключ по получателю для порядка сообщений
@@ -111,6 +122,7 @@ func (h *Handler) SendMessage(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"status": "sent",
 		"id":     msg.ID,
+		"seq":    msg.SequenceNumber,
 	})
 }
 
@@ -128,27 +140,27 @@ func (h *Handler) HandleWS(c echo.Context) error {
 	}
 
 	// Регистрируем клиента
-	h.Hub.Mu.Lock()
-	h.Hub.Clients[userID] = append(h.Hub.Clients[userID], ws)
-	h.Hub.Mu.Unlock()
+	h.hub.Mu.Lock()
+	h.hub.Clients[userID] = append(h.hub.Clients[userID], ws)
+	h.hub.Mu.Unlock()
 
-	h.Logger.Info("User connected to WS", zap.String("user_id", userID))
+	h.logger.Info("User connected to WS", zap.String("user_id", userID))
 
 	// Ждем закрытия (важно очистить память!)
 	defer func() {
-		h.Hub.Mu.Lock()
+		h.hub.Mu.Lock()
 		// Удаляем конкретное соединение из слайса
-		connections := h.Hub.Clients[userID]
+		connections := h.hub.Clients[userID]
 		if len(connections) == 0 {
-			delete(h.Hub.Clients, userID)
+			delete(h.hub.Clients, userID)
 		}
 		for i, conn := range connections {
 			if conn == ws {
-				h.Hub.Clients[userID] = append(connections[:i], connections[i+1:]...)
+				h.hub.Clients[userID] = append(connections[:i], connections[i+1:]...)
 				break
 			}
 		}
-		h.Hub.Mu.Unlock()
+		h.hub.Mu.Unlock()
 		ws.Close()
 	}()
 

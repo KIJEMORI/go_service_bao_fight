@@ -8,7 +8,7 @@ import (
 )
 
 func (h *Handler) SearchUser(c echo.Context) error {
-	query := c.QueryParam("user") // Например: /api/v1/prot/search?q=ivan
+	query := c.QueryParam("user") // Например: /api/v1/prot/search?user=ivan
 	if len(query) < 3 {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "min 3 characters"})
 	}
@@ -16,7 +16,7 @@ func (h *Handler) SearchUser(c echo.Context) error {
 	var profiles []models.Profile
 	// Поиск по нику (ровное начало) или по отображаемому имени (везде)
 	// ILIKE — регистронезависимый поиск в Postgres
-	err := h.DB.Where("nick_name ILIKE ? OR user_name ILIKE ?", query+"%", "%"+query+"%").
+	err := h.db.Where("nick_name ILIKE ? OR user_name ILIKE ?", query+"%", "%"+query+"%").
 		Limit(20).
 		Find(&profiles).Error
 

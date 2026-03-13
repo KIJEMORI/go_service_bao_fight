@@ -36,7 +36,7 @@ func (h *Handler) createSession(c echo.Context, userID uuid.UUID) (string, strin
 		ExpiresAt:    time.Now().Add(time.Hour * 24 * 30), // 30 дней
 	}
 
-	if err := h.DB.Create(&session).Error; err != nil {
+	if err := h.db.Create(&session).Error; err != nil {
 		return "", "", err
 	}
 
@@ -53,16 +53,16 @@ func (h *Handler) Refresh(c echo.Context) error {
 
 	// Ищем сессию в БД
 	var session models.Session
-	err := h.DB.Where("refresh_token = ? AND expires_at > ?", input.RefreshToken, time.Now()).
+	err := h.db.Where("refresh_token = ? AND expires_at > ?", input.RefreshToken, time.Now()).
 		First(&session).Error
 
 	if err != nil {
-		h.DB.Where("refresh_token = ?", input.RefreshToken).Delete(&models.Session{})
+		h.db.Where("refresh_token = ?", input.RefreshToken).Delete(&models.Session{})
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "session expired or invalid"})
 	}
 
 	// Удаляем старую сессию (Refresh Token Rotation - для безопасности)
-	h.DB.Delete(&session)
+	h.db.Delete(&session)
 
 	// Создаем новую пару токенов
 	at, rt, err := h.createSession(c, session.UserID)
@@ -83,13 +83,13 @@ func (h *Handler) Logout(c echo.Context) error {
 	c.Bind(&input)
 
 	// Удаляем сессию по токену
-	if err := h.DB.Where("refresh_token = ?", input.RefreshToken).Delete(&models.Session{}).Error; err != nil {
+	if err := h.db.Where("refresh_token = ?", input.RefreshToken).Delete(&models.Session{}).Error; err != nil {
 		return c.JSON(500, map[string]string{"error": "failed to logout"})
 	}
 
 	// Кидаем в Kafka факт того, что сессия закрыта
 	payload, _ := json.Marshal(map[string]string{"event": "session_terminated", "token": input.RefreshToken})
-	_ = h.KafkaWriter.WriteMessages(c.Request().Context(), kafka.Message{
+	_ = h.kafkaWriter.WriteMessages(c.Request().Context(), kafka.Message{
 		Topic: kafka_topics.LogoutToipic.String(),
 		Value: payload,
 	})

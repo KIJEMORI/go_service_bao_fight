@@ -15,7 +15,7 @@ import (
 
 func (h *Handler) RegisterUser(c echo.Context) error {
 
-	h.Logger.Info("Request Content-Type", zap.String("ct", c.Request().Header.Get("Content-Type")))
+	h.logger.Info("Request Content-Type", zap.String("ct", c.Request().Header.Get("Content-Type")))
 
 	ctx := c.Request().Context()
 
@@ -44,7 +44,7 @@ func (h *Handler) RegisterUser(c echo.Context) error {
 		Email:        input.Email,
 		PasswordHash: string(hashedPassword),
 	}
-	if err := h.DB.WithContext(ctx).Create(&user).Error; err != nil {
+	if err := h.db.WithContext(ctx).Create(&user).Error; err != nil {
 		// Проверяем на дубликат (Postgres SQLState 23505)
 		if strings.Contains(err.Error(), "duplicate key") {
 			return c.JSON(http.StatusConflict, map[string]string{"error": "email already taken"})
@@ -62,7 +62,7 @@ func (h *Handler) RegisterUser(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to encode message"})
 	}
 
-	err = h.KafkaWriter.WriteMessages(ctx,
+	err = h.kafkaWriter.WriteMessages(ctx,
 		kafka.Message{
 			Topic: kafka_topics.UserRegisterTopic.String(),
 			Key:   []byte(input.Email), // Хорошая практика: использовать email как ключ для партиционирования

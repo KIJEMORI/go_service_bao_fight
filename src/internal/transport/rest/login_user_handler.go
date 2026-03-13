@@ -16,10 +16,13 @@ func (h *Handler) LoginUser(c echo.Context) error {
 	if err := c.Bind(&input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "bad request"})
 	}
+	if err := c.Validate(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "bad request"})
+	}
 
 	// Ищем юзера (Прямой запрос)
 	var user models.User
-	if err := h.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+	if err := h.db.Where("email = ?", input.Email).First(&user).Error; err != nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 	}
 
@@ -31,10 +34,10 @@ func (h *Handler) LoginUser(c echo.Context) error {
 	// Генерируем JWT
 	at, rt, err := h.createSession(c, user.ID)
 	if err != nil {
-		return c.JSON(500, map[string]string{"error": "session error"})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "session error"})
 	}
 
-	return c.JSON(http.StatusCreated, map[string]interface{}{
+	return c.JSON(http.StatusOK, map[string]interface{}{
 		"access_token":  at,
 		"refresh_token": rt,
 		"user_id":       user.ID.String(),

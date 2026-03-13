@@ -18,6 +18,7 @@ import (
 	"project/internal/service"
 	"project/internal/worker"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
@@ -84,7 +85,7 @@ func main() {
 
 	if enabled(startflags.UserRegisterFlag) {
 		userHandler := service.NewUserRegisterHandler(db, logger, &kafka.Writer{Addr: kafka.TCP(broker)})
-		start("user-saver", string(kafka_topics.UserRegisterTopic), userHandler, 2) // 2 горутины
+		start("user-saver", kafka_topics.UserRegisterTopic.String(), userHandler, 2) // 2 горутины
 	}
 	if *mode == "logs" || *mode == "all" {
 		// logHandler := service.NewLogHandler(db, logger)
@@ -92,7 +93,27 @@ func main() {
 	}
 	if enabled(startflags.SendMessage) {
 		msgHandler := service.NewMessageSaveHandler(db, logger)
-		start("message-saver-v2", string(kafka_topics.ChatMessagesTopic), msgHandler, 3)
+		start("message-saver-v2", kafka_topics.ChatMessagesTopic.String(), msgHandler, 3)
+	}
+	if enabled(startflags.ReactionWorker) {
+		writer := &kafka.Writer{
+			Addr:     kafka.TCP(os.Getenv("KAFKA_BROKER")),
+			Balancer: &kafka.LeastBytes{},
+		}
+		defer writer.Close()
+
+		rdb := redis.NewClient(&redis.Options{
+			Addr: os.Getenv("REDIS_HOST"),
+		})
+
+		// Проверка связи (Healthcheck)
+		if err := rdb.Ping(context.Background()).Err(); err != nil {
+			logger.Fatal("Redis not reachable", zap.Error(err))
+		}
+
+		reactionHandler := service.NewReactionHandler(db, writer, rdb, logger)
+		// Запускаем воркер: читает топик user-reactions, сохраняет пачками по 50
+		start("reaction-processor", kafka_topics.ActionLikeProfile.String(), reactionHandler, 2)
 	}
 
 	logger.Info("All consumers are running...")

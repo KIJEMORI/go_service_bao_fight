@@ -41,27 +41,36 @@ func NewRouter(h *rest.Handler, enabledServices []string) *echo.Echo {
 	}
 
 	if enabled(startflags.UserRegisterFlag) {
-		v1.POST("/register_user", h.RegisterUser)
+		v1.POST("/register", h.RegisterUser)
 	}
 
 	if enabled(startflags.UserLoginFlag) {
-		v1.POST("/login_user", h.LoginUser)
+		v1.POST("/login", h.LoginUser)
 	}
 
 	protected := v1.Group("/prot")
 	protected.Use(echojwt.WithConfig(jwtConfig))
 
+	if enabled(startflags.RefreshSession) {
+		protected.POST("/refresh_session", h.Refresh)
+	}
+	if enabled(startflags.LogoutFromSession) {
+		protected.POST("/logout_from_session", h.Logout)
+	}
 	if enabled(startflags.SearchUserFlag) {
-		protected.GET("/search_user", h.SearchUser)
+		protected.GET("/search/user", h.SearchUser)
 	}
 	if enabled(startflags.SendMessage) {
-		protected.POST("/send_message", h.SendMessage)
+		protected.POST("/message/send", h.SendMessage)
+	}
+	if enabled(startflags.WebSocket) {
+		protected.GET("/ws", h.HandleWS)
 	}
 	if enabled(startflags.GetMessages) {
 		// Внутри NewRouter, в группе protected
+		protected.GET("/get_chats", h.GetChats)
+		protected.GET("/chat/history", h.GetChatHistory)
 		protected.POST("/join_chat", h.JoinChat)
-		protected.GET("/messages", h.GetChatHistory)
-		protected.GET("/ws_messages", h.HandleWS)
 	}
 	if enabled(startflags.ChangeProfile) {
 		protected.GET("/get_profile", h.GetProfile)

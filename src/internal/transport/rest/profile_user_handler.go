@@ -3,6 +3,7 @@ package rest
 import (
 	"net/http"
 	"project/internal/models"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -24,7 +25,7 @@ func (h *Handler) GetProfile(c echo.Context) error {
 	}
 
 	var profile models.Profile
-	if err := h.DB.WithContext(c.Request().Context()).Where("user_id = ?", uID).First(&profile).Error; err != nil {
+	if err := h.db.WithContext(c.Request().Context()).Where("user_id = ?", uID).First(&profile).Error; err != nil {
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "profile not found"})
 	}
 
@@ -60,7 +61,7 @@ func (h *Handler) ChangeProfile(c echo.Context) error {
 
 	uID, err := uuid.Parse(userID)
 	if err != nil {
-		h.Logger.Error("Invalid sender UUID", zap.String("id", userID))
+		h.logger.Error("Invalid sender UUID", zap.String("id", userID))
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid sender id"})
 	}
 
@@ -78,9 +79,10 @@ func (h *Handler) ChangeProfile(c echo.Context) error {
 
 	ctx := c.Request().Context()
 
-	err = h.DB.WithContext(ctx).Clauses(clause.OnConflict{
+	err = h.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "user_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
+			"nick_name",
 			"user_name",
 			"age",
 			"gender",
@@ -92,6 +94,9 @@ func (h *Handler) ChangeProfile(c echo.Context) error {
 	}).Create(&profile).Error
 
 	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") {
+			return c.JSON(http.StatusConflict, map[string]string{"error": "nickname taken"})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "database error"})
 	}
 
