@@ -1,8 +1,8 @@
 services:
   postgres:
     image: postgres:17-alpine
-    env_file:
-      - ./configs/local.env
+    # env_file:
+    #   - ./configs/local.env
     environment:
       POSTGRES_USER: ${DB_CONFIG_USER}
       POSTGRES_PASSWORD: ${DB_CONFIG_PASSWORD}
@@ -93,8 +93,8 @@ services:
     # ports:
     #   - "9000:9000" # API
     #   - "9001:9001" # Консоль управления
-    env_file:
-      - ./configs/minio.env
+    # env_file:
+    #   - ./configs/minio.env
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
