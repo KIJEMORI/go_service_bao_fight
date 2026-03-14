@@ -40,7 +40,7 @@ jobs:
           # Ждем, пока базы станут доступны (healthcheck из твоего compose)
           echo "Waiting for services health..."
           # Пример ожидания Postgres
-          until [ "`docker inspect -f {{.State.Health.Status}} $(docker-compose ps -q postgres)`" == "healthy" ]; do
+          until [ "`docker inspect -f {{.State.Health.Status}} $(docker compose ps -q postgres)`" == "healthy" ]; do
             sleep 2
           done
 
