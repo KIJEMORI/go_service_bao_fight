@@ -8,6 +8,13 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
+      - name: Hard Cleanup Infrastructure
+        run: |
+          # Останавливаем всё, что могло остаться от прошлых билдов
+          docker compose down -v || true
+          k3d cluster delete bao-cluster || true
+          docker volume rm $(docker volume ls -q -f name=pg_data) || true
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -46,9 +53,6 @@ jobs:
 
       - name: Create k3d Cluster
         run: |
-          # Удаляем старый кластер, если он остался от прошлого запуска
-          k3d cluster delete bao-cluster || true
-
           # Получаем IP шлюза, чтобы k3d видел контейнеры Docker Compose
           GATEWAY_IP=$(docker network inspect app-network -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
 
