@@ -4,8 +4,8 @@ WORKDIR /app
 COPY src/ ./
 RUN go mod download
 
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /producer ./cmd/app/producer/main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /consumer ./cmd/app/consumer/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o producer ./cmd/app/producer/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o consumer ./cmd/app/consumer/main.go
 
 FROM alpine:latest
 WORKDIR /app
