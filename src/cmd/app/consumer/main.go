@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	mode := flag.String("mode", "all", "Which workers to run: 'users', 'logs' or 'all'")
+	mode := flag.String("service", "all", "Which workers to run: 'users', 'logs' or 'all'")
 	flag.Parse()
 
 	services := strings.Split(*mode, ",")

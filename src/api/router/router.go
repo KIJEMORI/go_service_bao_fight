@@ -80,6 +80,12 @@ func NewRouter(h *rest.Handler, enabledServices []string) *echo.Echo {
 		protected.GET("/change_profile_avatar_url", h.GetUploadURL)
 		protected.POST("/confirm_change_profile_avatar", h.ConfirmUpload)
 	}
+	if enabled(startflags.ReactionWorker) {
+		reaction := protected.Group("/reaction_system")
+		reaction.GET("/get_recommended_profiles", h.GetDiscovery)
+		reaction.POST("/set_reaction", h.SetReaction)
+		reaction.GET("/get_liking_me_profiles", h.GetLikingProfiles)
+	}
 
 	return e
 }

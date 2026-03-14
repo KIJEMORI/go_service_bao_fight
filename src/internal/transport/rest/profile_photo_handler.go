@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"net/http"
 	"project/internal/models"
 	"strings"
 	"time"
@@ -81,11 +82,11 @@ func (h *Handler) GetUploadURL(c echo.Context) error {
 
 	if err != nil {
 		h.logger.Error("S3 presign failed", zap.Error(err))
-		return c.JSON(500, map[string]string{"error": "failed to gen url"})
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to gen url"})
 	}
 	externalURL := strings.Replace(presignedURL.String(), "http://minio:9000/profiles", "http://localhost/s3-upload", 1)
 
-	return c.JSON(200, map[string]string{
+	return c.JSON(http.StatusOK, map[string]string{
 		"upload_url": externalURL,
 		"object_key": objectName,
 	})
@@ -96,6 +97,10 @@ func (h *Handler) ConfirmUpload(c echo.Context) error {
 		ObjectKey string `json:"object_key"`
 	}
 	c.Bind(&input)
+
+	if input.ObjectKey == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
 
 	userVal := c.Get("user")
 	userID, err := getSenderID(c, h, userVal)
@@ -127,7 +132,7 @@ func (h *Handler) ConfirmUpload(c echo.Context) error {
 	// Уведомляем систему через Kafka
 	// h.KafkaWriter.WriteMessages(...)
 
-	return c.JSON(200, map[string]string{"photo_url": photoURL})
+	return c.JSON(http.StatusOK, map[string]string{"photo_url": photoURL})
 }
 
 // func (h *Handler) UploadPhotoToS3(c echo.Context) error {

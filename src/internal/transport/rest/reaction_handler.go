@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -36,10 +37,11 @@ func (h *Handler) GetDiscovery(c echo.Context) error {
 		h.db.Table("profiles").
 			Joins("LEFT JOIN reactions ON reactions.to_user_id = profiles.user_id AND reactions.from_user_id = ?", userID).
 			Where("reactions.id IS NULL AND profiles.user_id != ?", userID).
-			Limit(100).Pluck("user_id", &candidateIDs)
+			Limit(100).Pluck("user_id", &candidateIDs).
+			Order("RANDOM()")
 
 		if len(candidateIDs) == 0 {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "discovery error"})
+			return c.JSON(http.StatusOK, map[string]string{"empty": "no more profiles"})
 		}
 		// Кладем их в redis List
 		h.redis.RPush(ctx, cacheKey, candidateIDs)
@@ -47,7 +49,7 @@ func (h *Handler) GetDiscovery(c echo.Context) error {
 		ids = candidateIDs[:min(10, len(candidateIDs))]
 	}
 
-	// 3. Достаем полные профили по этим 10 ID
+	// Достаем полные профили по этим 10 ID
 	var profiles []models.Profile
 	h.db.Where("user_id IN ?", ids).Find(&profiles)
 
@@ -99,25 +101,52 @@ func (h *Handler) GetLikingProfiles(c echo.Context) error {
 	//uID, _ := uuid.Parse(userID)
 
 	ctx := c.Request().Context()
+	cacheKey := "fans:" + userID
 
-	fanIDs, err := h.redis.SMembers(ctx, "fans:"+userID).Result()
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	beforeTS := c.QueryParam("before_ts")
+	maxScore := "+inf"
+	if beforeTS != "" {
+		maxScore = "(" + beforeTS // Строго меньше (исключая само граничное значение)
+	}
+
+	fanIDs, err := h.redis.ZRevRangeByScore(ctx, cacheKey, &redis.ZRangeBy{
+		Max:    maxScore,
+		Min:    "-inf",
+		Offset: 0,
+		Count:  int64(limit),
+	}).Result()
+
 	if err != nil || len(fanIDs) == 0 {
-		h.db.Table("reactions").
-			Where("to_user_id = ? AND action = 'like'", userID).
-			// Доп. проверка: исключаем тех, кому МЫ уже ответили (чтобы не было дублей в ленте)
+		var dbReactions []models.Reaction
+		h.db.Where("to_user_id = ? AND action = 'like'", userID).
 			Where("from_user_id NOT IN (SELECT to_user_id FROM reactions WHERE from_user_id = ?)", userID).
-			Pluck("from_user_id", &fanIDs)
+			Order("created_at DESC").Limit(100).Find(&dbReactions)
 
 		// Сразу закидываем в Redis, чтобы следующий запрос был быстрым
-		if len(fanIDs) > 0 {
-			args := make([]interface{}, len(fanIDs))
-			for i, v := range fanIDs {
-				args[i] = v
+		if len(dbReactions) > 0 {
+			var zMembers []redis.Z
+			for _, r := range dbReactions {
+				zMembers = append(zMembers, redis.Z{
+					Score:  float64(r.CreatedAt.Unix()), // Время как оценка для сортировки
+					Member: r.FromUserID.String(),
+				})
+				fanIDs = append(fanIDs, r.FromUserID.String())
 			}
-			h.redis.SAdd(ctx, "fans:"+userID, args...)
-			h.redis.Expire(ctx, "fans:"+userID, time.Hour*24)
+			h.redis.ZAdd(ctx, cacheKey, zMembers...)
+			h.redis.Expire(ctx, cacheKey, time.Hour*24)
+			if len(fanIDs) > limit {
+				fanIDs = fanIDs[:limit]
+			}
 		} else {
-			return c.JSON(http.StatusOK, []models.Profile{})
+			return c.JSON(http.StatusOK, map[string]interface{}{
+				"profiles": []models.Profile{},
+				"next_ts":  0,
+			})
 		}
 	}
 
@@ -126,7 +155,18 @@ func (h *Handler) GetLikingProfiles(c echo.Context) error {
 	if err := h.db.Where("user_id IN ?", fanIDs).Find(&profiles).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch fans"})
 	}
-	return c.JSON(http.StatusOK, profiles)
+
+	var nextTS int64
+	if len(profiles) > 0 {
+		// Берем Score (время) последнего элемента
+		lastScore, _ := h.redis.ZScore(ctx, cacheKey, fanIDs[len(fanIDs)-1]).Result()
+		nextTS = int64(lastScore)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"profiles": profiles,
+		"next_ts":  nextTS, // Фронт пришлет это в следующем запросе как before_ts
+	})
 }
 
 func (h *Handler) StartNotificationWatcher(ctx context.Context, broker string, topics []string) {

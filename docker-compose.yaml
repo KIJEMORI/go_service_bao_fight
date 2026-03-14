@@ -21,6 +21,10 @@ services:
 
   kafka:
     image: apache/kafka:3.7.0
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     env_file:
       - ./configs/kafka.env
     healthcheck:
@@ -41,48 +45,48 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
       DYNAMIC_CONFIG_ENABLED: "true"
 
-  producer-api:
-    build: .
-    env_file:
-      - ./configs/local.env
-      - ./configs/minio.env
-    command: ["./producer", "-service=all"]
-    # ports: ["8080:8080"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    depends_on:
-      kafka:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      - MINIO_ENDPOINT=minio:9000
-      - KAFKA_BROKER=kafka:9092
-      - DB_CONFIG_HOST=postgres
-      - REDIS_HOST=redis:6379
-    networks:
-      - app-network
+  # producer-api:
+  #   build: .
+  #   env_file:
+  #     - ./configs/local.env
+  #     - ./configs/minio.env
+  #   command: ["./producer", "-service=all"]
+  #   # ports: ["8080:8080"]
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 10s
+  #   depends_on:
+  #     kafka:
+  #       condition: service_healthy
+  #     minio:
+  #       condition: service_healthy
+  #   environment:
+  #     - MINIO_ENDPOINT=minio:9000
+  #     - KAFKA_BROKER=kafka:9092
+  #     - DB_CONFIG_HOST=postgres
+  #     - REDIS_HOST=redis:6379
+  #   networks:
+  #     - app-network
 
-  consumer-worker:
-    build: .
-    env_file:
-      - ./configs/local.env
-    command: ["./consumer", "-mode=all"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    environment:
-      - KAFKA_BROKER=kafka:9092
-      - DB_CONFIG_HOST=postgres
-      - REDIS_HOST=redis:6379
-    networks:
-      - app-network
+  # consumer-worker:
+  #   build: .
+  #   env_file:
+  #     - ./configs/local.env
+  #   command: ["./consumer", "-mode=all"]
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #   environment:
+  #     - KAFKA_BROKER=kafka:9092
+  #     - DB_CONFIG_HOST=postgres
+  #     - REDIS_HOST=redis:6379
+  #   networks:
+  #     - app-network
 
   minio:
     image: minio/minio
@@ -102,30 +106,34 @@ services:
     environment:
       MINIO_BROWSER_REDIRECT_URL: "http://localhost/minio-admin/"
 
-  gateway:
-    image: openresty/openresty:alpine # nginx
-    ports:
-      - "80:80" # HTTP
-      - "8080:8080" # старый порт для API
-    volumes:
-      - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
-      - ./nginx/lua:/usr/local/openresty/nginx/conf/lua:ro
-      - ./nginx/cache:/var/cache/nginx/s3_cache # Папка для кэша картинок
-    depends_on:
-      minio:
-        condition: service_healthy
-      producer-api:
-        condition: service_healthy
-    networks:
-      - app-network
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
+  # gateway:
+  #   image: openresty/openresty:alpine # nginx
+  #   ports:
+  #     - "80:80" # HTTP
+  #     - "8080:8080" # старый порт для API
+  #   volumes:
+  #     - ./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+  #     - ./nginx/lua:/usr/local/openresty/nginx/conf/lua:ro
+  #     - ./nginx/cache:/var/cache/nginx/s3_cache # Папка для кэша картинок
+  #   depends_on:
+  #     minio:
+  #       condition: service_healthy
+  #     producer-api:
+  #       condition: service_healthy
+  #   networks:
+  #     - app-network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #         cpus: "0.5"
 
   redis:
     image: redis:7-alpine
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     ports:
       - "6379:6379"
     command: >
