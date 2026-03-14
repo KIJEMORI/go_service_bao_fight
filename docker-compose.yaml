@@ -90,9 +90,9 @@ services:
 
   minio:
     image: minio/minio
-    # ports:
-    #   - "9000:9000" # API
-    #   - "9001:9001" # Консоль управления
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Консоль управления
     # env_file:
     #   - ./configs/minio.env
     command: server /data --console-address ":9001" --address ":9000"
