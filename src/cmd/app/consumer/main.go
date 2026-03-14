@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"project/internal/config"
 	"project/internal/database"
 	"project/internal/infrastructure/kafka_topics"
 	startflags "project/internal/infrastructure/start_flags"
@@ -32,7 +31,7 @@ func main() {
 	// Инициализация логгера и конфигов
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
-	config.LoadEnvironment()
+	//config.LoadEnvironment()
 
 	broker := os.Getenv("KAFKA_BROKER")
 	if broker == "" {

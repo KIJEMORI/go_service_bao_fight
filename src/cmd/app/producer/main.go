@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"project/api/router"
-	"project/internal/config"
 	"project/internal/database"
 	"project/internal/infrastructure/kafka_topics"
 	startflags "project/internal/infrastructure/start_flags"
@@ -34,7 +33,7 @@ func main() {
 	// Инициализация инфраструктуры
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
-	config.LoadEnvironment()
+	//config.LoadEnvironment()
 
 	services := strings.Split(*mode, ",")
 
