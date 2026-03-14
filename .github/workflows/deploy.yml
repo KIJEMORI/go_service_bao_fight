@@ -46,6 +46,9 @@ jobs:
 
       - name: Create k3d Cluster
         run: |
+          # Удаляем старый кластер, если он остался от прошлого запуска
+          k3d cluster delete bao-cluster || true
+
           # Получаем IP шлюза, чтобы k3d видел контейнеры Docker Compose
           GATEWAY_IP=$(docker network inspect app-network -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
 
