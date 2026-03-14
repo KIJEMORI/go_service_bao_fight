@@ -95,7 +95,7 @@ services:
     #   - "9001:9001" # Консоль управления
     # env_file:
     #   - ./configs/minio.env
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":9001" --address ":9000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
