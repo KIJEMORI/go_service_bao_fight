@@ -18,11 +18,6 @@ metadata:
     # REWRITE аналог rewrite в nginx
     nginx.ingress.kubernetes.io/rewrite-target: /$1
 
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      access_by_lua_block {
-
-      }
-
     # Sticky Sessions для WebSocket (чтобы клиент не прыгал между подами)
     nginx.ingress.kubernetes.io/affinity: "cookie"
     nginx.ingress.kubernetes.io/session-cookie-name: "route"
