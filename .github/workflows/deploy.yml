@@ -87,9 +87,7 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=120s
 
-          kubectl get pods
-          kubectl describe ingress
-          kubectl get svc
+
 
           # Деплоим Helm чарт
           helm upgrade --install bao-fight ./deploy/helm/bao-fight \
@@ -98,4 +96,8 @@ jobs:
             --set secrets.DB_CONFIG_PASSWORD="$DB_PASS" \
             --set secrets.JWT_SECRET="$JWT_KEY" \
             --set secrets.MINIO_ROOT_PASSWORD="$MINIO_PASS" \
-            --wait
+
+
+          kubectl get pods
+          kubectl describe ingress
+          kubectl get svc
