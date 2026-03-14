@@ -107,6 +107,7 @@ jobs:
             --set secrets.JWT_SECRET="$JWT_KEY" \
             --set secrets.MINIO_ROOT_USER="$MINIO_ROOT_USER" \
             --set secrets.MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
+            --wait
 
 
           kubectl get pods
