@@ -103,6 +103,7 @@ jobs:
             --set secrets.DB_CONFIG_PASSWORD="$DB_PASS" \
             --set secrets.JWT_SECRET="$JWT_KEY" \
             --set secrets.MINIO_ROOT_PASSWORD="$MINIO_PASS" \
+            --wait
 
 
           kubectl get pods
