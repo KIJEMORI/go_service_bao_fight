@@ -87,6 +87,10 @@ jobs:
             --selector=app.kubernetes.io/component=controller \
             --timeout=120s
 
+          kubectl get pods
+          kubectl describe ingress
+          kubectl get svc
+
           # Деплоим Helm чарт
           helm upgrade --install bao-fight ./deploy/helm/bao-fight \
             --set image.tag=local \
