@@ -1,0 +1,45 @@
+{{- range $key, $val := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $val.name }}
+spec:
+  replicas: {{ $val.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $val.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $val.name }}
+    spec:
+      containers:
+        - name: bao-fight
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: IfNotPresent # Важно для k3d local images
+          command: {{ $val.command | toJson }}
+          args: ["-service={{ $val.flags }}"]
+          envFrom:
+            - configMapRef:
+                name: bao-fight-config
+            - secretRef:
+                name: bao-fight-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          {{- if ne $key "worker" }} # Воркеру обычно не нужен порт и пробы
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- end }}
+{{- end }}

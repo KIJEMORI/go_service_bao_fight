@@ -1,0 +1,17 @@
+{{- range $key, $val := .Values.services }}
+{{- if ne $key "worker" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $val.name }}-service
+spec:
+  selector:
+    app: {{ $val.name }}
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+{{- end }}
+{{- end }}
+---

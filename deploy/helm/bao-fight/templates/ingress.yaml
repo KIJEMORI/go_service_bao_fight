@@ -1,0 +1,74 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: main-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # аналог limit_req_zone
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+
+    #S3 cache и timeouts для WebSocket
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+    # PUT для s3-upload
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # REWRITE аналог rewrite в nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      access_by_lua_block {
+
+      }
+
+    # Sticky Sessions для WebSocket (чтобы клиент не прыгал между подами)
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /storage/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: minio-service # Проксируем на Minio
+                port:
+                  number: 9000
+          - path: /api/v1/prot/ws
+            pathType: Prefix
+            backend:
+              service:
+                name: bao-chat-service
+                port:
+                  number: 8080
+          - path: /api/v1/prot/message
+            pathType: Prefix
+            backend:
+              service:
+                name: bao-chat-service
+                port:
+                  number: 8080
+          - path: /api/(register|login)
+            pathType: Prefix
+            backend:
+              service:
+                name: bao-auth-service
+                port:
+                  number: 8080
+          - path: /api/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: bao-auth-service
+                port:
+                  number: 8080
+          - path: /minio-admin/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: minio-console-service
+                port:
+                  number: 9001

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: bao-fight
+description: Helm chart for Bao Fight Messenger (Auth, Chat, Worker)
+type: application
+
+# Версия самого чарта (меняется при изменении манифестов)
+version: 0.1.0
+
+# Версия твоего Go-приложения (тег образа по умолчанию)
+appVersion: "1.0.0"

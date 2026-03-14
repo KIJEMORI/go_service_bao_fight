@@ -1,0 +1,37 @@
+# values.yaml
+image:
+  repository: bao-fight
+  tag: local
+
+config:
+  DB_CONFIG_HOST: "postgres"
+  DB_CONFIG_PORT: "5432"
+  KAFKA_BROKER: "kafka:9092"
+  REDIS_HOST: "redis"
+  MINIO_ENDPOINT: "minio:9000"
+
+secrets:
+  DB_CONFIG_USER: ""
+  DB_CONFIG_PASSWORD: ""
+  JWT_SECRET: ""
+  MINIO_ROOT_PASSWORD: ""
+
+services:
+  auth:
+    name: "bao-auth"
+    command: ["./producer"]
+    flags: "user_register,user_login"
+    replicas: 1
+    hpa_enabled: false
+  chat:
+    name: "bao-chat"
+    command: ["./producer"]
+    flags: "send_message,get_messages,web_socket"
+    replicas: 1
+    hpa_enabled: true
+  worker:
+    name: "bao-worker"
+    command: ["./consumer"]
+    flags: "reaction_worker"
+    replicas: 1
+    hpa_enabled: true
