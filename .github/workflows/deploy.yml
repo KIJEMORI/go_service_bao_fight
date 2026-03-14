@@ -73,7 +73,7 @@ jobs:
 
       - name: Build and Deploy
         env:
-          DB_USER: ${{ secrets.DB_USER }}
+          DB_USER: ${{ secrets.DB_CONFIG_USER }}
           DB_PASS: ${{ secrets.DB_CONFIG_PASSWORD }}
           JWT_KEY: ${{ secrets.JWT_SECRET }}
           MINIO_PASS: ${{ secrets.MINIO_ROOT_PASSWORD }}
