@@ -8,11 +8,13 @@ spec:
   replicas: {{ $val.replicas }}
   selector:
     matchLabels:
-      app: {{ $val.name }}
+      app: bao-fight
+      service: {{ $val.name }}
   template:
     metadata:
       labels:
-        app: {{ $val.name }}
+        app: bao-fight
+        service: {{ $val.name }}
     spec:
       containers:
         - name: bao-fight
