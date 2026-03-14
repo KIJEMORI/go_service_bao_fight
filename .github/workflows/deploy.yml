@@ -52,7 +52,7 @@ jobs:
           done
 
           echo "Waiting for Minio health..."
-          ntil [ "` docker inspect -f {{.State.Health.Status}} $(docker compose ps -q minio)`" == "healthy" ]; do
+          until [ "`docker inspect -f {{.State.Health.Status}} $(docker compose ps -q minio)`" == "healthy" ]; do
             sleep 2
           done
 
