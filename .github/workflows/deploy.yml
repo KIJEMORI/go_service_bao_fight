@@ -51,6 +51,11 @@ jobs:
             sleep 2
           done
 
+          echo "Waiting for Minio health..."
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' minio)" == "healthy" ]; do
+            sleep 2
+          done
+
       - name: Create k3d Cluster
         run: |
           # Получаем IP шлюза, чтобы k3d видел контейнеры Docker Compose

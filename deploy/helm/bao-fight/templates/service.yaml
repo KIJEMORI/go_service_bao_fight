@@ -7,7 +7,8 @@ metadata:
   name: {{ $val.name }}-service
 spec:
   selector:
-    app: {{ $val.name }}
+    app: bao-fight
+    service: {{ $val.name }}
   ports:
     - protocol: TCP
       port: 8080
