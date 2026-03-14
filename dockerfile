@@ -5,8 +5,8 @@ COPY src/go.mod src/go.sum ./
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o producer ./src/cmd/app/producer/main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -o consumer ./src/cmd/app/consumer/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o producer ./src/cmd/app/producer/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o consumer ./src/cmd/app/consumer/main.go
 
 FROM alpine:latest
 WORKDIR /app
