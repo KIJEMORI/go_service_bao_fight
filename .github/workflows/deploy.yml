@@ -13,7 +13,7 @@ jobs:
           # Останавливаем всё, что могло остаться от прошлых билдов
           docker compose down -v || true
           k3d cluster delete bao-cluster || true
-          docker volume rm $(docker volume ls -q -f name=pg_data) || true
+          docker volume rm pg_data || true
 
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,11 +27,11 @@ jobs:
       - name: Start Infrastructure (Docker Compose)
         env:
           # Привязываем секреты GitHub к переменным окружения шага
-          DB_USER: ${{ secrets.DB_CONFIG_USER }}
-          DB_PASS: ${{ secrets.DB_CONFIG_PASSWORD }}
-          DB_NAME: ${{ secrets.DB_CONFIG_DBNAME }}
-          MINIO_USER: ${{ secrets.MINIO_ROOT_USER }}
-          MINIO_PASS: ${{ secrets.MINIO_ROOT_PASSWORD }}
+          DB_CONFIG_USER: ${{ secrets.DB_CONFIG_USER }}
+          DB_CONFIG_PASSWORD: ${{ secrets.DB_CONFIG_PASSWORD }}
+          DB_CONFIG_DBNAME: ${{ secrets.DB_CONFIG_DBNAME }}
+          MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
         run: |
           # Создаем сеть вручную, чтобы k3d мог к ней подключиться
           docker network create app-network || true
