@@ -34,7 +34,7 @@ jobs:
           DB_CONFIG_DBNAME=$DB_NAME \
           MINIO_ROOT_USER=$MINIO_USER \
           MINIO_ROOT_PASSWORD=$MINIO_PASS \
-          docker-compose up -d
+          docker compose up -d
 
 
           # Ждем, пока базы станут доступны (healthcheck из твоего compose)
