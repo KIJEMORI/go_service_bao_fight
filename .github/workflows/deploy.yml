@@ -8,15 +8,15 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Hard Cleanup Infrastructure
         run: |
           # Останавливаем всё, что могло остаться от прошлых билдов
           docker compose down -v || true
           k3d cluster delete bao-cluster || true
           docker volume rm pg_data || true
-
-      - name: Checkout Code
-        uses: actions/checkout@v4
 
       - name: Install k3d & Helm
         run: |
@@ -36,11 +36,11 @@ jobs:
           # Создаем сеть вручную, чтобы k3d мог к ней подключиться
           docker network create app-network || true
           # Передаем переменные напрямую в процесс docker-compose
-          DB_CONFIG_USER=$DB_USER \
-          DB_CONFIG_PASSWORD=$DB_PASS \
-          DB_CONFIG_DBNAME=$DB_NAME \
-          MINIO_ROOT_USER=$MINIO_USER \
-          MINIO_ROOT_PASSWORD=$MINIO_PASS \
+          DB_CONFIG_USER=$DB_CONFIG_USER \
+          DB_CONFIG_PASSWORD=$DB_CONFIG_PASSWORD \
+          DB_CONFIG_DBNAME=$DB_CONFIG_DBNAME \
+          MINIO_ROOT_USER=$MINIO_ROOT_USER \
+          MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD \
           docker compose up -d
 
 
