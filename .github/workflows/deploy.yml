@@ -77,10 +77,11 @@ jobs:
 
       - name: Build and Deploy
         env:
-          DB_USER: ${{ secrets.DB_CONFIG_USER }}
-          DB_PASS: ${{ secrets.DB_CONFIG_PASSWORD }}
+          DB_CONFIG_USER: ${{ secrets.DB_CONFIG_USER }}
+          DB_CONFIG_PASSWORD: ${{ secrets.DB_CONFIG_PASSWORD }}
+          DB_CONFIG_DBNAME: ${{ secrets.DB_CONFIG_DBNAME }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
           JWT_KEY: ${{ secrets.JWT_SECRET }}
-          MINIO_PASS: ${{ secrets.MINIO_ROOT_PASSWORD }}
         run: |
           # Собираем образ приложения
           docker build -t bao-fight:local .
@@ -99,10 +100,11 @@ jobs:
           # Деплоим Helm чарт
           helm upgrade --install bao-fight ./deploy/helm/bao-fight \
             --set image.tag=local \
-            --set secrets.DB_CONFIG_USER="$DB_USER" \
-            --set secrets.DB_CONFIG_PASSWORD="$DB_PASS" \
+            --set secrets.DB_CONFIG_USER="$DB_CONFIG_USER" \
+            --set secrets.DB_CONFIG_PASSWORD="$DB_CONFIG_PASSWORD" \
+            --set secrets.DB_CONFIG_DBNAME="$DB_CONFIG_DBNAME" \
             --set secrets.JWT_SECRET="$JWT_KEY" \
-            --set secrets.MINIO_ROOT_PASSWORD="$MINIO_PASS" \
+            --set secrets.MINIO_ROOT_PASSWORD="$MINIO_ROOT_PASSWORD" \
             --wait
 
 

@@ -8,11 +8,12 @@ config:
   DB_CONFIG_PORT: "5432"
   KAFKA_BROKER: "kafka:9092"
   REDIS_HOST: "redis"
-  MINIO_ENDPOINT: "minio:9000"
+  MINIO_ROOT_USER: "minio:9000"
 
 secrets:
   DB_CONFIG_USER: ""
   DB_CONFIG_PASSWORD: ""
+  DB_CONFIG_DBNAME: ""
   JWT_SECRET: ""
   MINIO_ROOT_PASSWORD: ""
 

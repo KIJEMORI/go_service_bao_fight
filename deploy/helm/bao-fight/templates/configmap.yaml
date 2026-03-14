@@ -7,4 +7,4 @@ data:
   DB_CONFIG_PORT: {{ .Values.config.DB_CONFIG_PORT | quote }}
   KAFKA_BROKER: {{ .Values.config.KAFKA_BROKER | quote }}
   REDIS_HOST: {{ .Values.config.REDIS_HOST | quote }}
-  MINIO_ENDPOINT: {{ .Values.config.MINIO_ENDPOINT | quote }}
+  MINIO_ROOT_USER: {{ .Values.config.MINIO_ROOT_USER | quote }}
